@@ -1,4 +1,3 @@
-// pages/api/get-report.js
 import AWS from 'aws-sdk';
 
 const s3 = new AWS.S3({
@@ -8,23 +7,30 @@ const s3 = new AWS.S3({
 });
 
 export default async function handler(req, res) {
-  const { key } = req.query; 
+  const { key } = req.query;
 
   if (!key || key === 'null') {
     return res.status(400).json({ error: 'Invalid file key' });
   }
 
+  // Check if bucket name env var is set
+  const bucketName = process.env.S3_BUCKET_NAME;
+  if (!bucketName) {
+      console.error("Missing S3_BUCKET_NAME environment variable");
+      return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   try {
     // Generate a secure URL valid for 5 minutes
     const url = await s3.getSignedUrlPromise('getObject', {
-      Bucket: 'nitish-pq-reports-private', // MUST match your bucket name exactly
+      Bucket: bucketName, // <--- Now dynamic from .env
       Key: key,
       Expires: 300, 
     });
 
     res.status(200).json({ url });
   } catch (error) {
-    console.error("S3 Error:", error);
+    console.error("S3 Signing Error:", error);
     res.status(500).json({ error: 'Failed to generate secure link' });
   }
 }

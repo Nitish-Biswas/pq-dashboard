@@ -22,38 +22,56 @@ export default function Dashboard() {
   }, []);
 
   // 2. Load Report Detail
-  const loadReport = async (scan) => {
-    setSelectedScan(scan);
-    setLoading(true);
-    setReportData(null);
+  // Inside pages/dashboard.js
 
-    const s3Key = scan.s3_key_file_report;
+    const loadReport = async (scan) => {
+        setSelectedScan(scan);
+        setLoading(true);
+        setReportData(null);
+        
+        const s3Key = scan.s3_key_file_report;
 
-    if (!s3Key || s3Key === 'missing' || s3Key === 'error_uploading') {
-        alert("No valid report file found for this scan.");
-        setLoading(false);
-        return;
-    }
+        if (!s3Key) {
+            alert("No report available.");
+            setLoading(false);
+            return;
+        }
 
-    try {
-        // A. Get Signed URL
-        const signRes = await fetch(`/api/get-report?key=${encodeURIComponent(s3Key)}`);
-        if (!signRes.ok) throw new Error("Failed to sign URL");
-        const signData = await signRes.json();
+        try {
+            console.log("Fetching signed URL for key:", s3Key);
 
-        // B. Fetch JSON
-        const fileRes = await fetch(signData.url);
-        if (!fileRes.ok) throw new Error("Failed to download file from S3");
-        const jsonData = await fileRes.json();
+            // --- STEP A: Get the secure link ---
+            const signRes = await fetch(`/api/get-report?key=${encodeURIComponent(s3Key)}`);
+            
+            // Check if the API call failed (e.g., 404 or 500)
+            if (!signRes.ok) {
+                const errorText = await signRes.text(); // Get text (HTML) instead of JSON to avoid crash
+                console.error("API Error Response:", errorText);
+                throw new Error(`API failed with status: ${signRes.status}`);
+            }
 
-        setReportData(jsonData);
-    } catch (err) {
-        console.error("Download Error:", err);
-        alert("Failed to load secure report.");
-    } finally {
-        setLoading(false);
-    }
-  };
+            const signData = await signRes.json();
+            console.log("Got Signed URL:", signData.url);
+
+            // --- STEP B: Download the file ---
+            const fileRes = await fetch(signData.url);
+
+            if (!fileRes.ok) {
+                const errorText = await fileRes.text();
+                console.error("S3 Error Response:", errorText);
+                throw new Error("Failed to download file from S3");
+            }
+
+            const jsonData = await fileRes.json();
+            setReportData(jsonData);
+
+        } catch (err) {
+            console.error("Load Error:", err);
+            alert(`Error: ${err.message}. Check console for details.`);
+        } finally {
+            setLoading(false);
+        }
+    };
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif', flexDirection: 'row' }}>
@@ -69,7 +87,7 @@ export default function Dashboard() {
         overflowY: 'auto' 
       }}>
         <div style={{ padding: '20px', borderBottom: '1px solid #ddd', background: '#fff' }}>
-            <h3 style={{ margin: 0 }}>PQ Scan History</h3>
+            <h3 style={{ margin: 0, color: '#000000ff' }}>PQ Scan History</h3>
         </div>
 
         {scans.length === 0 && <div style={{padding: '20px'}}>No scans found or loading...</div>}
@@ -82,17 +100,17 @@ export default function Dashboard() {
               padding: '15px', 
               borderBottom: '1px solid #eee', 
               cursor: 'pointer',
-              background: selectedScan?.run_id === scan.run_id ? '#e3f2fd' : 'transparent',
+              background: selectedScan?.run_id === scan.run_id ? '#1690e7ff' : 'transparent',
               transition: 'background 0.2s'
             }}
           >
-            <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+            <div style={{ fontWeight: 'bold', color: '#000000ff', marginBottom: '5px' }}>
                 {scan.commit_message ? scan.commit_message.substring(0,40) : "No Message"}...
             </div>
             <div style={{ fontSize: '0.8em', color: '#666' }}>
               {new Date(scan.timestamp).toLocaleString()}
             </div>
-            <div style={{ fontSize: '0.7em', color: '#999', marginTop: '4px' }}>
+            <div style={{ fontSize: '0.7em', color: '#da1313ff', marginTop: '4px' }}>
               Commit: {scan.commit_hash ? scan.commit_hash.substring(0,7) : "N/A"}
             </div>
           </div>
@@ -165,7 +183,7 @@ export default function Dashboard() {
                         <tbody>
                           {reportData.items?.map((item, idx) => (
                             <tr key={idx} style={{ borderBottom: '1px solid #eee', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                              <td style={{ padding: '15px', fontWeight: '500' }}>
+                              <td style={{ padding: '15px', color: '#1565c0', fontWeight: '500' }}>
                                   {item.id.split('/').slice(-2).join('/')}
                               </td>
                               <td style={{ padding: '15px' }}>
